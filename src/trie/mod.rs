@@ -256,7 +256,13 @@ fn parse_param(param: &str) -> (String, Regex) {
     let mut in_param = true;
     for c in param.chars() {
         match c {
-            ':' => in_param = false,
+            ':' => {
+                if in_param {
+                    in_param = false;
+                } else {
+                    regex.push(c);
+                }
+            }
             c => {
                 if in_param {
                     param_name.push(c);
@@ -576,6 +582,50 @@ mod test {
                             key: "thread".to_string(),
                             value: Some("/b/:board/:thread"),
                             param: Some(Regex::new("[0-9]+").unwrap()),
+                            children: Vec::new(),
+                        })],
+                                                                 })],
+                                              })],
+                           })],
+        };
+
+        assert_eq!(trie, trie2);
+
+        let (val, map) = trie.get("/b/a/5").unwrap();
+        assert_eq!(val, Some("/b/:board/:thread"));
+        assert_eq!(map.get(&"thread".to_string()), Some(&"5".to_string()));
+
+        assert_eq!(trie.get("/b/a/b"), None);
+    }
+
+    #[test]
+    fn senatus_02() {
+        let mut trie = TrieNode::new();
+        trie.insert("/", "/");
+        trie.insert("/b/{board}", "/b/:board");
+        trie.insert("/b/{board}/{thread:[:digit:]+}", "/b/:board/:thread");
+
+        let trie2 = TrieNode {
+            key: "/".to_string(),
+            value: Some("/"),
+            param: None,
+            children: vec![Box::new(TrieNode {
+                               key: "b/".to_string(),
+                               value: None,
+                               param: None,
+                               children: vec![Box::new(TrieNode {
+                                                  key: "board".to_string(),
+                                                  value: Some("/b/:board"),
+                                                  param: Some(wild_regex()),
+                                                  children: vec![Box::new(TrieNode {
+                                                                     key: "/".to_string(),
+                                                                     value: None,
+                                                                     param: None,
+                                                                     children:
+                                                                         vec![Box::new(TrieNode {
+                            key: "thread".to_string(),
+                            value: Some("/b/:board/:thread"),
+                            param: Some(Regex::new("[:digit:]+").unwrap()),
                             children: Vec::new(),
                         })],
                                                                  })],
