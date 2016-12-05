@@ -13,17 +13,15 @@ extern crate serde_json;
 mod error;
 mod trie;
 
-use hayaku_http::{Handler, Method, Request, RequestHandler, ResponseWriter, Status};
+use hayaku_http::{Handler, Method, Request, RequestHandler, Response, Status};
 
 use std::collections::HashMap;
-use std::io::Write;
-use std::rc::Rc;
 
 pub use error::Error;
 
 use trie::TrieNode;
 
-type Tree<T> = HashMap<Method, TrieNode<Rc<RequestHandler<T>>>>;
+type Tree<T> = HashMap<Method, TrieNode<RequestHandler<T>>>;
 
 #[derive(Clone)]
 pub struct Router<T: Clone> {
@@ -56,7 +54,7 @@ pub struct Router<T: Clone> {
     pub handle_options: bool,
     /// Configurable handler which is called when no matching route is
     /// found. If it is `None`, the default 404 handler is used.
-    not_found: Option<Rc<RequestHandler<T>>>,
+    not_found: Option<RequestHandler<T>>,
 }
 
 impl<T: Clone> Router<T> {
@@ -71,14 +69,14 @@ impl<T: Clone> Router<T> {
         }
     }
 
-    pub fn set_not_found_handler(&mut self, handler: Rc<RequestHandler<T>>) {
+    pub fn set_not_found_handler(&mut self, handler: RequestHandler<T>) {
         self.not_found = Some(handler);
     }
 
     /// `get` is a shortcut for `Self::handle(Method::Get, path, handle)`.
     pub fn get<S: Into<String>>(&mut self,
                                 path: S,
-                                handle: Rc<RequestHandler<T>>)
+                                handle: RequestHandler<T>)
                                 -> Result<(), Error> {
         self.handle(Method::Get, path, handle)
     }
@@ -86,7 +84,7 @@ impl<T: Clone> Router<T> {
     /// `head` is a shortcut for `Self::handle(Method::Head, path, handle)`.
     pub fn head<S: Into<String>>(&mut self,
                                  path: S,
-                                 handle: Rc<RequestHandler<T>>)
+                                 handle: RequestHandler<T>)
                                  -> Result<(), Error> {
         self.handle(Method::Head, path, handle)
     }
@@ -94,7 +92,7 @@ impl<T: Clone> Router<T> {
     /// `options` is a shortcut for `Self::handle(Method::Options, path, handle)`.
     pub fn options<S: Into<String>>(&mut self,
                                     path: S,
-                                    handle: Rc<RequestHandler<T>>)
+                                    handle: RequestHandler<T>)
                                     -> Result<(), Error> {
         self.handle(Method::Options, path, handle)
     }
@@ -102,7 +100,7 @@ impl<T: Clone> Router<T> {
     /// `post` is a shortcut for `Self::handle(Method::Post, path, handle)`.
     pub fn post<S: Into<String>>(&mut self,
                                  path: S,
-                                 handle: Rc<RequestHandler<T>>)
+                                 handle: RequestHandler<T>)
                                  -> Result<(), Error> {
         self.handle(Method::Post, path, handle)
     }
@@ -110,7 +108,7 @@ impl<T: Clone> Router<T> {
     /// `put` is a shortcut for `Self::handle(Method::Put, path, handle)`.
     pub fn put<S: Into<String>>(&mut self,
                                 path: S,
-                                handle: Rc<RequestHandler<T>>)
+                                handle: RequestHandler<T>)
                                 -> Result<(), Error> {
         self.handle(Method::Put, path, handle)
     }
@@ -118,7 +116,7 @@ impl<T: Clone> Router<T> {
     /// `patch` is a shortcut for `Self::handle(Method::Patch, path, handle)`.
     pub fn patch<S: Into<String>>(&mut self,
                                   path: S,
-                                  handle: Rc<RequestHandler<T>>)
+                                  handle: RequestHandler<T>)
                                   -> Result<(), Error> {
         self.handle(Method::Patch, path, handle)
     }
@@ -126,7 +124,7 @@ impl<T: Clone> Router<T> {
     /// `delete` is a shortcut for `Self::handle(Method::Delete, path, handle)`.
     pub fn delete<S: Into<String>>(&mut self,
                                    path: S,
-                                   handle: Rc<RequestHandler<T>>)
+                                   handle: RequestHandler<T>)
                                    -> Result<(), Error> {
         self.handle(Method::Delete, path, handle)
     }
@@ -142,7 +140,7 @@ impl<T: Clone> Router<T> {
     pub fn handle<S: Into<String>>(&mut self,
                                    method: Method,
                                    path: S,
-                                   handle: Rc<RequestHandler<T>>)
+                                   handle: RequestHandler<T>)
                                    -> Result<(), Error> {
         let path = path.into();
         if !path.starts_with('/') {
@@ -166,10 +164,10 @@ impl<T: Clone> Router<T> {
 
 impl<T: Clone> Handler<T> for Router<T> {
     // Handler makes the router implement the fasthttp.ListenAndServe interface.
-    fn handler(&self, req: &Request, res: &mut ResponseWriter, ctx: &T) {
-        let path = req.path;
+    fn handler(&self, req: &Request, res: &mut Response, ctx: &T) {
+        let path = req.path().unwrap();
         debug!("path: {}", path);
-        let method = &req.method;
+        let method = req.method();
         debug!("method: {:?}", method);
         if let Some(root) = self.trees.get(method) {
             match root.get(path) {
@@ -183,7 +181,7 @@ impl<T: Clone> Handler<T> for Router<T> {
                         // Default handler
                         res.status(Status::NotFound);
                         let msg = String::from("404, path \"") + path + "\" not found :(";
-                        res.write_all(msg.as_bytes()).unwrap();
+                        res.body(msg.into_bytes())
                     } else {
                         // We have already checked that self.not_found is not
                         // `None`, so unwrapping should be okay.
@@ -191,6 +189,21 @@ impl<T: Clone> Handler<T> for Router<T> {
                         handle(req, res, ctx);
                     }
                 }
+            }
+        } else {
+            // TODO(nokaa): We want to send a different error than 404
+            // for this case. In this case we have an incorrect method being
+            // used.
+            if self.not_found.is_none() {
+                // Default handler
+                res.status(Status::NotFound);
+                let msg = String::from("404, path \"") + path + "\" not found :(";
+                res.body(msg.into_bytes());
+            } else {
+                // We have already checked that self.not_found is not
+                // `None`, so unwrapping should be okay.
+                let handle = self.not_found.clone().unwrap();
+                handle(req, res, ctx);
             }
         }
     }
