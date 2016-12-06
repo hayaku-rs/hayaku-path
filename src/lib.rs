@@ -164,13 +164,13 @@ impl<T: Clone> Router<T> {
 
 impl<T: Clone> Handler<T> for Router<T> {
     // Handler makes the router implement the fasthttp.ListenAndServe interface.
-    fn handler(&self, req: &Request, res: &mut Response, ctx: &T) {
+    fn handler(&self, req: Request, res: &mut Response, ctx: &T) {
         let path = req.path().unwrap();
         debug!("path: {}", path);
-        let method = req.method();
+        let method = req.method().clone();
         debug!("method: {:?}", method);
-        if let Some(root) = self.trees.get(method) {
-            match root.get(path) {
+        if let Some(root) = self.trees.get(&method) {
+            match root.get(&path) {
                 Some((val, map)) => {
                     let serialized = serde_json::to_vec(&map).unwrap();
                     *req.user_data.borrow_mut() = serialized;
@@ -180,7 +180,7 @@ impl<T: Clone> Handler<T> for Router<T> {
                     if self.not_found.is_none() {
                         // Default handler
                         res.status(Status::NotFound);
-                        let msg = String::from("404, path \"") + path + "\" not found :(";
+                        let msg = String::from("404, path \"") + &path + "\" not found :(";
                         res.body(msg.into_bytes())
                     } else {
                         // We have already checked that self.not_found is not
@@ -197,7 +197,7 @@ impl<T: Clone> Handler<T> for Router<T> {
             if self.not_found.is_none() {
                 // Default handler
                 res.status(Status::NotFound);
-                let msg = String::from("404, path \"") + path + "\" not found :(";
+                let msg = String::from("404, path \"") + &path + "\" not found :(";
                 res.body(msg.into_bytes());
             } else {
                 // We have already checked that self.not_found is not
