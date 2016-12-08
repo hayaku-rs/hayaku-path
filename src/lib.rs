@@ -164,7 +164,7 @@ impl<T: Clone> Router<T> {
 
 impl<T: Clone> Handler<T> for Router<T> {
     // Handler makes the router implement the fasthttp.ListenAndServe interface.
-    fn handler(&self, req: Request, res: &mut Response, ctx: &T) {
+    fn handler(&self, req: &Request, res: &mut Response, ctx: &T) {
         let path = req.path().unwrap();
         debug!("path: {}", path);
         let method = req.method().clone();
