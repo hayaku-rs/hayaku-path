@@ -165,8 +165,8 @@ impl<T: Clone> Router<T> {
 impl<T: Clone> Handler<T> for Router<T> {
     // Handler makes the router implement the fasthttp.ListenAndServe interface.
     fn handler(&self, req: &Request, res: &mut Response, ctx: &T) {
+        let path = req.path();
         let path = {
-            let path = req.path().unwrap();
             let data_loc = path.find('?').unwrap_or(path.len());
             &path[..data_loc]
         };
@@ -185,7 +185,7 @@ impl<T: Clone> Handler<T> for Router<T> {
                         // Default handler
                         res.status(Status::NotFound);
                         let msg = String::from("404, path \"") + &path + "\" not found :(";
-                        res.body(msg.into_bytes())
+                        res.body(&msg.into_bytes());
                     } else {
                         // We have already checked that self.not_found is not
                         // `None`, so unwrapping should be okay.
@@ -202,7 +202,7 @@ impl<T: Clone> Handler<T> for Router<T> {
                 // Default handler
                 res.status(Status::NotFound);
                 let msg = String::from("404, path \"") + &path + "\" not found :(";
-                res.body(msg.into_bytes());
+                res.body(&msg.into_bytes());
             } else {
                 // We have already checked that self.not_found is not
                 // `None`, so unwrapping should be okay.
