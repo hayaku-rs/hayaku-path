@@ -173,8 +173,9 @@ impl<T: Clone> Handler<T> for Router<T> {
         debug!("path: {}", path);
         let method = req.method().clone();
         debug!("method: {:?}", method);
+
         if let Some(root) = self.trees.get(&method) {
-            match root.get(&path) {
+            match root.get(path) {
                 Some((val, map)) => {
                     let serialized = serde_json::to_vec(&map).unwrap();
                     *req.user_data.borrow_mut() = serialized;
@@ -184,7 +185,7 @@ impl<T: Clone> Handler<T> for Router<T> {
                     if self.not_found.is_none() {
                         // Default handler
                         res.status(Status::NotFound);
-                        let msg = String::from("404, path \"") + &path + "\" not found :(";
+                        let msg = String::from("404, path \"") + path + "\" not found :(";
                         res.body(&msg.into_bytes());
                     } else {
                         // We have already checked that self.not_found is not
@@ -194,21 +195,19 @@ impl<T: Clone> Handler<T> for Router<T> {
                     }
                 }
             }
-        } else {
             // TODO(nokaa): We want to send a different error than 404
             // for this case. In this case we have an incorrect method being
             // used.
-            if self.not_found.is_none() {
-                // Default handler
-                res.status(Status::NotFound);
-                let msg = String::from("404, path \"") + &path + "\" not found :(";
-                res.body(&msg.into_bytes());
-            } else {
-                // We have already checked that self.not_found is not
-                // `None`, so unwrapping should be okay.
-                let handle = self.not_found.clone().unwrap();
-                handle(req, res, ctx);
-            }
+        } else if self.not_found.is_none() {
+            // Default handler
+            res.status(Status::NotFound);
+            let msg = String::from("404, path \"") + path + "\" not found :(";
+            res.body(&msg.into_bytes());
+        } else {
+            // We have already checked that self.not_found is not
+            // `None`, so unwrapping should be okay.
+            let handle = self.not_found.clone().unwrap();
+            handle(req, res, ctx);
         }
     }
 }
