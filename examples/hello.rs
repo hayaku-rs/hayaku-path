@@ -23,12 +23,12 @@ fn main() {
 }
 
 fn hello_handler(_req: &Request, res: &mut Response, _ctx: &()) {
-    res.body(b"hello, world!").unwrap();
+    res.body(b"hello, world!");
 }
 
 fn plain_handler(_req: &Request, res: &mut Response, _ctx: &()) {
     res.add_header("Content-Type".to_string(), "text/plain".to_string());
-    res.body(b"hello, world!").unwrap();
+    res.body(b"hello, world!");
 }
 
 #[derive(Serialize, Deserialize)]
@@ -41,5 +41,5 @@ fn json_handler(_req: &Request, res: &mut Response, _ctx: &()) {
     let data = serde_json::to_vec(&msg).unwrap();
 
     res.add_header("Content-Type".to_string(), "application/json".to_string());
-    res.body(&data).unwrap();
+    res.body(&data);
 }
