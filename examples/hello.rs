@@ -19,9 +19,7 @@ fn main() {
     router.get("/plaintext", Arc::new(plain_handler)).unwrap();
     router.get("/json", Arc::new(json_handler)).unwrap();
 
-    let mut http = Http::new(router, ());
-    http.threads(4);
-    http.listen_and_serve(addr);
+    Http::new(router, ()).threads(4).listen_and_serve(addr);
 }
 
 fn hello_handler(_req: &Request, res: &mut Response, _ctx: &()) {
