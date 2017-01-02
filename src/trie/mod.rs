@@ -507,8 +507,7 @@ mod test {
         let mut trie = TrieNode::new();
         trie.insert("/", "/");
         trie.insert("/b/{board}", "/b/:board");
-        // trie.insert("/b/{board}/{thread:[:digit:]+}", "/b/:board/:thread");
-        trie.insert(r"/b/{board}/{thread:[\d]+}", "/b/:board/:thread");
+        trie.insert("/b/{board}/{thread:[[:digit:]]+}", "/b/:board/:thread");
 
         let trie2 = TrieNode {
             key: "/".to_string(),
@@ -530,8 +529,7 @@ mod test {
                                                                          vec![Box::new(TrieNode {
                             key: "thread".to_string(),
                             value: Some("/b/:board/:thread"),
-                            //param: Some(Regex::new("[:digit:]+")),
-                            param: Some(Regex::new(r"[\d]+")),
+                            param: Some(Regex::new("[[:digit:]]+")),
                             children: Vec::new(),
                         })],
                                                                  })],
