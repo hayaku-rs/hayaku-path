@@ -1,4 +1,8 @@
-use regex::Regex;
+mod reg;
+mod util;
+
+use self::reg::Regex;
+use self::util::{end_of_param, parse_param, get_match_len, get_params_indices, splitn};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -243,112 +247,12 @@ impl<T: Clone> TrieNode<T> {
     }
 }
 
-fn end_of_param(path: &str) -> String {
-    match path.find('/') {
-        Some(i) => path[i..].to_string(),
-        None => String::new(),
-    }
-}
-
-fn parse_param(param: &str) -> (String, Regex) {
-    let mut param_name = String::new();
-    let mut regex = String::new();
-    let mut in_param = true;
-    for c in param.chars() {
-        match c {
-            ':' => {
-                if in_param {
-                    in_param = false;
-                } else {
-                    regex.push(c);
-                }
-            }
-            c => {
-                if in_param {
-                    param_name.push(c);
-                } else {
-                    regex.push(c);
-                }
-            }
-        }
-    }
-    if regex.is_empty() {
-        regex = ".+".to_string();
-    }
-    let regex = Regex::new(&regex).unwrap();
-    (param_name, regex)
-}
-
-/// Determines the length of the shared prefix of two strings.
-/// E.g. `get_match_len("apple", "ape") => 2`.
-fn get_match_len(a: &str, b: &str) -> usize {
-    let mut match_len = 0;
-    for (ac, bc) in a.chars().zip(b.chars()) {
-        if ac == bc && bc != '{' {
-            match_len += 1;
-        } else {
-            break;
-        }
-    }
-    match_len
-}
-
-fn get_params_indices(path: &str) -> Vec<(usize, usize)> {
-    let mut indices = Vec::new();
-    let mut start = 0;
-    let mut braces = 0usize;
-    for (i, c) in path.char_indices() {
-        match c {
-            '{' => {
-                if braces == 0 {
-                    start = i;
-                }
-                braces += 1;
-            }
-            '}' => {
-                braces -= 1;
-                if braces == 0 {
-                    indices.push((start, i + 1));
-                }
-            }
-            _ => {}
-        }
-    }
-    // If `in_param`, there is a missing `}`.
-    assert_eq!(braces, 0);
-    indices
-}
-
-fn splitn(s: &str, n: usize, pat: char) -> Vec<String> {
-    let mut n = n;
-    let mut strings = Vec::new();
-    let mut buf = String::new();
-
-    for ch in s.chars() {
-        if n <= 1 {
-            buf.push(ch);
-            continue;
-        }
-        if ch == pat {
-            n -= 1;
-            strings.push(buf);
-            buf = String::new();
-            buf.push(ch);
-        } else {
-            buf.push(ch);
-        }
-    }
-    strings.push(buf);
-    strings
-}
-
 #[cfg(test)]
 mod test {
-    use super::{get_match_len, TrieNode};
-    use regex::Regex;
+    use super::{get_match_len, Regex, TrieNode};
 
     fn wild_regex() -> Regex {
-        Regex::new(".+").unwrap()
+        Regex::new(".+")
     }
 
     #[test]
@@ -581,7 +485,7 @@ mod test {
                                                                          vec![Box::new(TrieNode {
                             key: "thread".to_string(),
                             value: Some("/b/:board/:thread"),
-                            param: Some(Regex::new("[0-9]+").unwrap()),
+                            param: Some(Regex::new("[0-9]+")),
                             children: Vec::new(),
                         })],
                                                                  })],
@@ -603,7 +507,8 @@ mod test {
         let mut trie = TrieNode::new();
         trie.insert("/", "/");
         trie.insert("/b/{board}", "/b/:board");
-        trie.insert("/b/{board}/{thread:[:digit:]+}", "/b/:board/:thread");
+        // trie.insert("/b/{board}/{thread:[:digit:]+}", "/b/:board/:thread");
+        trie.insert(r"/b/{board}/{thread:[\d]+}", "/b/:board/:thread");
 
         let trie2 = TrieNode {
             key: "/".to_string(),
@@ -625,7 +530,8 @@ mod test {
                                                                          vec![Box::new(TrieNode {
                             key: "thread".to_string(),
                             value: Some("/b/:board/:thread"),
-                            param: Some(Regex::new("[:digit:]+").unwrap()),
+                            //param: Some(Regex::new("[:digit:]+")),
+                            param: Some(Regex::new(r"[\d]+")),
                             children: Vec::new(),
                         })],
                                                                  })],
@@ -636,6 +542,7 @@ mod test {
         assert_eq!(trie, trie2);
 
         let (val, map) = trie.get("/b/a/5").unwrap();
+        println!("got the val!");
         assert_eq!(val, Some("/b/:board/:thread"));
         assert_eq!(map.get(&"thread".to_string()), Some(&"5".to_string()));
 
