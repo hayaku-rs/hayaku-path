@@ -94,18 +94,6 @@ impl<T: Clone> TrieNode<T> {
         None
     }
 
-    /// Create a new child node with the given key-value pair and add it
-    /// as a child to node `self`.
-    fn add_new_child(&mut self, key: String, value: Option<T>, param: Option<Regex>) {
-        let child = TrieNode {
-            key: key,
-            value: value,
-            children: Vec::new(),
-            param: param,
-        };
-        self.children.push(Box::new(child));
-    }
-
     /// Inserts a key-value pair into the trie.
     pub fn insert<S: Into<String>>(&mut self, key: S, value: T) {
         let key = key.into();
@@ -175,7 +163,10 @@ impl<T: Clone> TrieNode<T> {
                 // This failing implies that we were given two of the same key
                 assert!(!key.is_empty());
 
-                self.insert_children(key, value, &[]);
+                // Get params, if any, for the key
+                let params = get_params_indices(&key);
+
+                self.insert_children(key, value, &params);
             }
         } else {
             // Current node is a param
@@ -183,6 +174,18 @@ impl<T: Clone> TrieNode<T> {
             let params = get_params_indices(&key);
             self.insert_children(key, value, &params);
         }
+    }
+
+    /// Create a new child node with the given key-value pair and add it
+    /// as a child to node `self`.
+    fn add_new_child(&mut self, key: String, value: Option<T>, param: Option<Regex>) {
+        let child = TrieNode {
+            key: key,
+            value: value,
+            children: Vec::new(),
+            param: param,
+        };
+        self.children.push(Box::new(child));
     }
 
     fn insert_children(&mut self, key: String, value: T, params: &[(usize, usize)]) {
@@ -421,7 +424,7 @@ mod test {
     }
 
     #[test]
-    fn senatus_01() {
+    fn neppit_01() {
         let mut trie = TrieNode::new();
         trie.insert("/", "/");
         trie.insert("/b/{board}", "/b/:board");
@@ -503,7 +506,7 @@ mod test {
     }
 
     #[test]
-    fn senatus_02() {
+    fn neppit_02() {
         let mut trie = TrieNode::new();
         trie.insert("/", "/");
         trie.insert("/b/{board}", "/b/:board");
@@ -540,10 +543,45 @@ mod test {
         assert_eq!(trie, trie2);
 
         let (val, map) = trie.get("/b/a/5").unwrap();
-        println!("got the val!");
         assert_eq!(val, Some("/b/:board/:thread"));
         assert_eq!(map.get(&"thread".to_string()), Some(&"5".to_string()));
 
         assert_eq!(trie.get("/b/a/b"), None);
+    }
+
+    #[test]
+    fn neppit_03() {
+        let mut trie = TrieNode::new();
+        trie.insert("/install", "/install");
+        trie.insert("/b/{board:[[:word:]]+}", "/b/:board");
+
+        let trie2 = TrieNode {
+            key: "/".to_string(),
+            value: None,
+            param: None,
+            children: vec![Box::new(TrieNode {
+                               key: "install".to_string(),
+                               value: Some("/install"),
+                               param: None,
+                               children: Vec::new(),
+                           }),
+                           Box::new(TrieNode {
+                               key: "b/".to_string(),
+                               value: None,
+                               param: None,
+                               children: vec![Box::new(TrieNode {
+                                                  key: "board".to_string(),
+                                                  value: Some("/b/:board"),
+                                                  param: Some(Regex::new("[[:word:]]+")),
+                                                  children: Vec::new(),
+                                              })],
+                           })],
+        };
+
+        assert_eq!(trie, trie2);
+
+        let (val, map) = trie.get("/b/rust").unwrap();
+        assert_eq!(val, Some("/b/:board"));
+        assert_eq!(map.get(&"board".to_string()), Some(&"rust".to_string()));
     }
 }
