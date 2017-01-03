@@ -175,6 +175,7 @@ impl<T: Clone> Handler<T> for Router<T> {
         debug!("method: {:?}", method);
 
         if let Some(root) = self.trees.get(&method) {
+            debug!("tree for method {:?} found", method);
             match root.get(path) {
                 Some((val, map)) => {
                     let serialized = serde_json::to_vec(&map).unwrap();
@@ -199,11 +200,13 @@ impl<T: Clone> Handler<T> for Router<T> {
             // for this case. In this case we have an incorrect method being
             // used.
         } else if self.not_found.is_none() {
+            debug!("tree for method {:?} not found", method);
             // Default handler
             res.status(Status::NotFound);
             let msg = String::from("404, path \"") + path + "\" not found :(";
             res.body(&msg.into_bytes());
         } else {
+            debug!("tree for method {:?} not found", method);
             // We have already checked that self.not_found is not
             // `None`, so unwrapping should be okay.
             let handle = self.not_found.clone().unwrap();

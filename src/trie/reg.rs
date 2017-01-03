@@ -5,6 +5,7 @@ use std::ops::Deref;
 pub struct Regex(pub regex::Regex);
 
 impl Regex {
+    #[allow(dead_code)]
     pub fn new(re: &str) -> Self {
         let regex = regex::Regex::new(re).unwrap();
         Regex(regex)
