@@ -13,13 +13,18 @@ extern crate serde_json;
 mod error;
 mod trie;
 
+use trie::TrieNode;
+
 use hayaku_http::{Handler, Method, Request, RequestHandler, Response, Status};
 
 use std::collections::HashMap;
 
 pub use error::Error;
 
-use trie::TrieNode;
+pub fn get_path_params(req: &Request) -> HashMap<String, String> {
+    serde_json::from_slice(&*req.user_data.borrow()).unwrap()
+}
+
 
 type Tree<T> = HashMap<Method, TrieNode<RequestHandler<T>>>;
 
