@@ -25,7 +25,6 @@ pub fn get_path_params(req: &Request) -> HashMap<String, String> {
     serde_json::from_slice(&*req.user_data.borrow()).unwrap()
 }
 
-
 type Tree<T> = HashMap<Method, TrieNode<RequestHandler<T>>>;
 
 #[derive(Clone)]
@@ -181,26 +180,41 @@ impl<T: Clone> Handler<T> for Router<T> {
 
         if let Some(root) = self.trees.get(&method) {
             debug!("tree for method {:?} found", method);
-            match root.get(path) {
-                Some((val, map)) => {
-                    let serialized = serde_json::to_vec(&map).unwrap();
-                    *req.user_data.borrow_mut() = serialized;
-                    val.unwrap()(req, res, ctx);
-                }
-                None => {
-                    if self.not_found.is_none() {
-                        // Default handler
-                        res.status(Status::NotFound);
-                        let msg = String::from("404, path \"") + path + "\" not found :(";
-                        res.body(&msg.into_bytes());
-                    } else {
-                        // We have already checked that self.not_found is not
-                        // `None`, so unwrapping should be okay.
-                        let handle = self.not_found.clone().unwrap();
-                        handle(req, res, ctx);
+
+            // This inner function allows us to easily do searches with
+            // multiple variations of the path, based on what router options
+            // have been set.
+            fn search<T: Clone>(router: &Router<T>,
+                                req: &Request,
+                                res: &mut Response,
+                                ctx: &T,
+                                root: &TrieNode<RequestHandler<T>>,
+                                path: &str) {
+                match root.get(path) {
+                    Some((val, map)) => {
+                        let serialized = serde_json::to_vec(&map).unwrap();
+                        *req.user_data.borrow_mut() = serialized;
+                        val.unwrap()(req, res, ctx);
+                    }
+                    None => {
+                        if router.redirect_trailing_slash && path.ends_with('/') {
+                            search(router, req, res, ctx, root, &path[..path.len() - 1])
+                        } else if router.not_found.is_none() {
+                            // Default handler
+                            res.status(Status::NotFound);
+                            let msg = String::from("404, path \"") + path + "\" not found :(";
+                            res.body(&msg.into_bytes());
+                        } else {
+                            // We have already checked that self.not_found is not
+                            // `None`, so unwrapping should be okay.
+                            let handle = router.not_found.clone().unwrap();
+                            handle(req, res, ctx);
+                        }
                     }
                 }
-            }
+            };
+            search(&self, req, res, ctx, root, path);
+
             // TODO(nokaa): We want to send a different error than 404
             // for this case. In this case we have an incorrect method being
             // used.
