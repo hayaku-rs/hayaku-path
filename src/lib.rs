@@ -213,7 +213,7 @@ impl<T: Clone> Handler<T> for Router<T> {
                     }
                 }
             };
-            search(&self, req, res, ctx, root, path);
+            search(self, req, res, ctx, root, path);
 
             // TODO(nokaa): We want to send a different error than 404
             // for this case. In this case we have an incorrect method being
